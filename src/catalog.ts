@@ -909,9 +909,11 @@ function bike(c: number) {
     return m;
   };
   const metal = { metalness: 0.6, roughness: 0.3 };
-  const R = 0.32;
-  const rear = P(-0.56, R), front = P(0.56, R), bb = P(-0.05, 0.3);
-  const seat = P(-0.22, 0.8), headTop = P(0.38, 0.88), headBot = P(0.42, 0.74);
+  // Maße so gewählt, dass Rahmenrohre mindestens 2 cm Abstand zu Reifen und Schutzblech haben
+  const R = 0.32, HUB = R + 0.036; // Reifen steht auf dem Boden
+  const rear = P(-0.56, HUB), front = P(0.62, HUB), bb = P(-0.05, 0.32);
+  const seat = P(-0.22, 0.84), headTop = P(0.43, 0.98), headBot = P(0.47, 0.82);
+  const headMid = headBot.clone().lerp(headTop, 0.3);
   // Räder: Reifen, Felge, Nabe, Speichen
   for (const w of [rear, front]) {
     b.torus(R, 0.035, w.x, w.y, 0, DARK);
@@ -926,7 +928,7 @@ function bike(c: number) {
   // Rahmen (Damenrad mit tiefem Einstieg)
   tube(bb, seat, 0.022, c);
   tube(bb, headBot, 0.024, c);
-  tube(P(-0.13, 0.52), P(0.4, 0.8), 0.02, c);
+  tube(P(-0.13, 0.55), headMid, 0.02, c);
   tube(headBot, headTop, 0.028, c);
   for (const z of [-0.06, 0.06]) {
     tube(bb, rear, 0.014, c, z);
@@ -934,23 +936,23 @@ function bike(c: number) {
     tube(headBot, front, 0.016, c, z);
   }
   // Sattel
-  tube(seat, P(-0.24, 0.9), 0.013, SILVER, 0, metal);
-  b.box(0.24, 0.05, 0.13, -0.24, 0.93, 0, DARK, 0.025);
-  b.sph(0.06, -0.32, 0.93, 0, DARK, 1, 0.45, 1.1);
+  tube(seat, P(-0.24, 0.94), 0.013, SILVER, 0, metal);
+  b.box(0.24, 0.05, 0.13, -0.24, 0.97, 0, DARK, 0.025);
+  b.sph(0.06, -0.32, 0.97, 0, DARK, 1, 0.45, 1.1);
   // Lenker
-  tube(headTop, P(0.34, 0.99), 0.015, SILVER, 0, metal);
-  b.cyl(0.014, 0.014, 0.5, 0.33, 0.99, 0, SILVER, 8, metal).rotation.x = Math.PI / 2;
+  tube(headTop, P(0.39, 1.08), 0.015, SILVER, 0, metal);
+  b.cyl(0.014, 0.014, 0.5, 0.38, 1.08, 0, SILVER, 8, metal).rotation.x = Math.PI / 2;
   for (const z of [-0.24, 0.24]) {
-    const g = b.cyl(0.022, 0.022, 0.1, 0.3, 0.99, z, L(c, 0.3), 10);
+    const g = b.cyl(0.022, 0.022, 0.1, 0.35, 1.08, z, L(c, 0.3), 10);
     g.rotation.x = Math.PI / 2;
   }
-  b.sph(0.025, 0.36, 1.01, 0.18, SILVER, 1, 1, 1, metal); // Klingel
+  b.sph(0.025, 0.41, 1.1, 0.18, SILVER, 1, 1, 1, metal); // Klingel
   // Körbchen vorne
-  b.box(0.24, 0.17, 0.3, 0.6, 0.92, 0, L(c, 0.45), 0.03);
-  b.box(0.2, 0.02, 0.26, 0.6, 1.01, 0, D(c, -0.1), 0.01);
-  b.sph(0.05, 0.58, 1.03, 0.05, RED);
-  b.sph(0.045, 0.64, 1.03, -0.06, YELLOW);
-  tube(headTop, P(0.5, 0.86), 0.01, SILVER, 0, metal);
+  b.box(0.24, 0.17, 0.3, 0.64, 0.96, 0, L(c, 0.45), 0.03);
+  b.box(0.2, 0.02, 0.26, 0.64, 1.05, 0, D(c, -0.1), 0.01);
+  b.sph(0.05, 0.62, 1.07, 0.05, RED);
+  b.sph(0.045, 0.68, 1.07, -0.06, YELLOW);
+  tube(headMid, P(0.53, 0.9), 0.01, SILVER, 0, metal);
   // Kurbel und Pedale
   b.cyl(0.07, 0.07, 0.02, bb.x, bb.y, 0.06, SILVER, 20, metal).rotation.x = Math.PI / 2;
   for (const sgn of [-1, 1]) {
@@ -962,12 +964,12 @@ function bike(c: number) {
   const guard = b.box(0.5, 0.06, 0.02, (bb.x + rear.x) / 2, (bb.y + rear.y) / 2 + 0.02, 0.07, c, 0.02);
   guard.rotation.z = Math.atan2(rear.y - bb.y, rear.x - bb.x) + Math.PI;
   for (const w of [rear, front]) {
-    const mg = b.torus(R + 0.05, 0.03, w.x, w.y, 0, c, Math.PI * 0.55);
-    mg.rotation.z = Math.PI * 0.22;
+    const mg = b.torus(R + 0.045, 0.025, w.x, w.y, 0, c, Math.PI * 0.5);
+    mg.rotation.z = w === front ? Math.PI * 0.2 : Math.PI * 0.28;
     mg.scale.z = 1.6;
   }
   // Ständer, damit es nicht umkippt
-  const st = tube(P(-0.12, 0.29), P(-0.24, 0.0), 0.012, SILVER, -0.09, metal);
+  const st = tube(P(-0.12, 0.3), P(-0.24, 0.0), 0.012, SILVER, -0.09, metal);
   st.rotation.x = -0.25;
   return b.g;
 }
