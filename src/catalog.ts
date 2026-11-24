@@ -822,15 +822,59 @@ function umbrella(c: number) {
 
 function swing(c: number) {
   const b = new B();
-  for (const s of [-1, 1]) {
-    const l1 = b.cyl(0.05, 0.05, 2.1, s * 0.8, 1.0, 0.45, DARKWOOD, 10);
-    l1.rotation.x = 0.4;
-    const l2 = b.cyl(0.05, 0.05, 2.1, s * 0.8, 1.0, -0.45, DARKWOOD, 10);
-    l2.rotation.x = -0.4;
+  const wood = DARKWOOD, top = 2.05, spread = 0.65;
+  // A-Gestelle links und rechts
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const len = Math.hypot(top, spread);
+      const leg = b.cyl(0.05, 0.055, len, sx * 0.95, top / 2, sz * spread / 2, wood, 10);
+      leg.rotation.x = -sz * Math.atan2(spread, top);
+    }
+    b.box(0.08, 0.08, spread * 1.1, sx * 0.95, 0.7, 0, wood, 0.02); // Querstrebe
   }
-  b.cyl(0.05, 0.05, 1.8, 0, 1.95, 0, DARKWOOD, 10).rotation.z = Math.PI / 2;
-  for (const s of [-1, 1]) b.cyl(0.008, 0.008, 1.45, s * 0.2, 1.22, 0, SILVER, 6);
-  b.box(0.5, 0.04, 0.2, 0, 0.5, 0, c, 0.015);
+  // Querbalken
+  b.cyl(0.06, 0.06, 2.1, 0, top, 0, wood, 12).rotation.z = Math.PI / 2;
+  // zwei Schaukeln
+  for (const [x, col] of [[-0.45, c], [0.45, L(c, 0.35)]] as [number, number][]) {
+    for (const dz of [-0.17, 0.17]) {
+      b.cyl(0.008, 0.008, top - 0.5, x, (top + 0.5) / 2, dz, SILVER, 6, { metalness: 0.6, roughness: 0.3 });
+      b.torus(0.03, 0.008, x, top - 0.04, dz, SILVER).rotation.y = Math.PI / 2;
+    }
+    b.box(0.22, 0.04, 0.46, x, 0.48, 0, col, 0.015);
+  }
+  return b.g;
+}
+
+function slide(c: number) {
+  const b = new B();
+  const h = 1.2, wood = WOOD;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.07, h + 0.7, 0.07, sx * 0.4, (h + 0.7) / 2, sz * 0.4 - 0.3, wood, 0.015);
+  b.box(0.88, 0.06, 0.88, 0, h, -0.3, wood, 0.02);
+  // Geländer oben
+  for (const sx of [-1, 1]) b.box(0.04, 0.04, 0.8, sx * 0.4, h + 0.55, -0.3, wood, 0.01);
+  b.box(0.8, 0.04, 0.04, 0, h + 0.55, -0.7, wood, 0.01);
+  // Dach
+  const roof = b.cyl(0.05, 0.75, 0.45, 0, h + 0.95, -0.3, c, 4);
+  roof.rotation.y = Math.PI / 4;
+  // Leiter hinten, oben am Podest angelehnt
+  const lb = -1.35, lt = -0.72, ldy = h + 0.05, lang = Math.atan2(lt - lb, ldy), llen = Math.hypot(lt - lb, ldy);
+  for (const sx of [-1, 1]) {
+    const r = b.box(0.05, llen, 0.05, sx * 0.22, ldy / 2, (lb + lt) / 2, wood, 0.01);
+    r.rotation.x = lang;
+  }
+  for (let i = 1; i <= 4; i++) {
+    const t = i / 5;
+    b.cyl(0.022, 0.022, 0.44, 0, ldy * t, lb + (lt - lb) * t, wood, 8).rotation.z = Math.PI / 2;
+  }
+  // Rutsche nach vorn
+  const run = 1.8, drop = h - 0.12, ang = Math.atan2(drop, run), len = Math.hypot(run, drop);
+  const ramp = b.box(0.5, 0.04, len, 0, (h + 0.12) / 2, 0.14 + run / 2, c, 0.02);
+  ramp.rotation.x = ang;
+  for (const sx of [-1, 1]) {
+    const rail = b.box(0.04, 0.14, len, sx * 0.27, (h + 0.12) / 2 + 0.07, 0.14 + run / 2, L(c, 0.2), 0.02);
+    rail.rotation.x = ang;
+  }
+  b.box(0.5, 0.04, 0.3, 0, 0.12, 0.14 + run + 0.12, c, 0.02);
   return b.g;
 }
 
@@ -866,8 +910,8 @@ function bike(c: number) {
   };
   const metal = { metalness: 0.6, roughness: 0.3 };
   const R = 0.32;
-  const rear = P(-0.52, R), front = P(0.52, R), bb = P(-0.05, 0.3);
-  const seat = P(-0.2, 0.78), headTop = P(0.36, 0.8), headBot = P(0.41, 0.62);
+  const rear = P(-0.56, R), front = P(0.56, R), bb = P(-0.05, 0.3);
+  const seat = P(-0.22, 0.8), headTop = P(0.38, 0.88), headBot = P(0.42, 0.74);
   // Räder: Reifen, Felge, Nabe, Speichen
   for (const w of [rear, front]) {
     b.torus(R, 0.035, w.x, w.y, 0, DARK);
@@ -882,30 +926,31 @@ function bike(c: number) {
   // Rahmen (Damenrad mit tiefem Einstieg)
   tube(bb, seat, 0.022, c);
   tube(bb, headBot, 0.024, c);
-  tube(P(-0.12, 0.5), P(0.39, 0.7), 0.02, c);
+  tube(P(-0.13, 0.52), P(0.4, 0.8), 0.02, c);
   tube(headBot, headTop, 0.028, c);
-  for (const z of [-0.045, 0.045]) {
+  for (const z of [-0.06, 0.06]) {
     tube(bb, rear, 0.014, c, z);
     tube(seat, rear, 0.013, c, z);
     tube(headBot, front, 0.016, c, z);
   }
   // Sattel
-  tube(seat, P(-0.22, 0.86), 0.013, SILVER, 0, metal);
-  b.box(0.24, 0.05, 0.13, -0.22, 0.89, 0, DARK, 0.025);
-  b.sph(0.06, -0.3, 0.89, 0, DARK, 1, 0.45, 1.1);
+  tube(seat, P(-0.24, 0.9), 0.013, SILVER, 0, metal);
+  b.box(0.24, 0.05, 0.13, -0.24, 0.93, 0, DARK, 0.025);
+  b.sph(0.06, -0.32, 0.93, 0, DARK, 1, 0.45, 1.1);
   // Lenker
-  tube(headTop, P(0.33, 0.92), 0.015, SILVER, 0, metal);
-  b.cyl(0.014, 0.014, 0.5, 0.33, 0.92, 0, SILVER, 8, metal).rotation.x = Math.PI / 2;
+  tube(headTop, P(0.34, 0.99), 0.015, SILVER, 0, metal);
+  b.cyl(0.014, 0.014, 0.5, 0.33, 0.99, 0, SILVER, 8, metal).rotation.x = Math.PI / 2;
   for (const z of [-0.24, 0.24]) {
-    const g = b.cyl(0.022, 0.022, 0.1, 0.31, 0.92, z, L(c, 0.3), 10);
+    const g = b.cyl(0.022, 0.022, 0.1, 0.3, 0.99, z, L(c, 0.3), 10);
     g.rotation.x = Math.PI / 2;
   }
-  b.sph(0.025, 0.38, 0.92, 0.18, SILVER, 1, 1, 1, metal); // Klingel
+  b.sph(0.025, 0.36, 1.01, 0.18, SILVER, 1, 1, 1, metal); // Klingel
   // Körbchen vorne
-  b.box(0.24, 0.17, 0.3, 0.52, 0.84, 0, L(c, 0.45), 0.03);
-  b.box(0.2, 0.02, 0.26, 0.52, 0.93, 0, D(c, -0.1), 0.01);
-  b.sph(0.05, 0.5, 0.95, 0.05, RED);
-  b.sph(0.045, 0.56, 0.95, -0.06, YELLOW);
+  b.box(0.24, 0.17, 0.3, 0.6, 0.92, 0, L(c, 0.45), 0.03);
+  b.box(0.2, 0.02, 0.26, 0.6, 1.01, 0, D(c, -0.1), 0.01);
+  b.sph(0.05, 0.58, 1.03, 0.05, RED);
+  b.sph(0.045, 0.64, 1.03, -0.06, YELLOW);
+  tube(headTop, P(0.5, 0.86), 0.01, SILVER, 0, metal);
   // Kurbel und Pedale
   b.cyl(0.07, 0.07, 0.02, bb.x, bb.y, 0.06, SILVER, 20, metal).rotation.x = Math.PI / 2;
   for (const sgn of [-1, 1]) {
@@ -1002,6 +1047,7 @@ export const ITEMS: ItemDef[] = [
   I('trampolin', 'Trampolin', 'garten', 'floor', [BLUE, GREEN, PINK, RED], trampoline),
   I('schirm', 'Sonnenschirm', 'garten', 'floor', [RED, YELLOW, SKY, PINK, MINT], umbrella),
   I('schaukel', 'Schaukel', 'garten', 'floor', [RED, YELLOW, SKY, PINK], swing),
+  I('rutsche', 'Rutsche', 'garten', 'floor', [YELLOW, RED, SKY, PINK, GREEN], slide),
   I('pool', 'Planschbecken', 'garten', 'floor', [SKY, PINK, YELLOW, MINT], pool),
   I('gartentisch', 'Gartentisch', 'garten', 'floor', [WHITE, MINT, YELLOW, WOOD], gardenTable),
   I('fahrrad', 'Fahrrad', 'garten', 'floor', [PINK, RED, SKY, MINT, VIOLET], bike),

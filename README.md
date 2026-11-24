@@ -25,6 +25,7 @@ Direkt in ein Haus springen: `?haus=sonnenhaus`, `?haus=villa`, `?haus=strandhau
 - **Speichern**: automatisch pro Haus im `localStorage`.
 - **Märchenschloss** mit Türmen, Zinnen, Erkern und Tor.
 - **Zusatzmöbel**: 116 Modelle aus dem Furniture Kit von Kenney (CC0, www.kenney.nl), Quelle in `assets-src/kenney/`, gebündelt mit `npm run models`.
+- **Babyschaukel und Wal-Rutsche**: „Balançoire et toboggan Playmobil“ von LaWouattebete (Cults3D), Lizenz CC BY. Die Druckteile (STL) liegen in `assets-src/cults-schaukel/` und werden in `src/cults.ts` zusammengesetzt.
 
 ## Aufbau
 

@@ -5,6 +5,7 @@ import { CATEGORIES, ITEMS, type Category } from './catalog';
 import { COVERINGS, coveringThumb } from './textures';
 import { renderHouseThumbs, renderItemThumbs } from './thumbs';
 import { loadKenney } from './kenney';
+import { loadCults, CULTS_CREDIT } from './cults';
 
 export class PmApp extends LitElement {
   static properties = {
@@ -59,16 +60,13 @@ export class PmApp extends LitElement {
     const bump = () => (this.tick = this.tick + 1);
     for (const ev of ['change', 'selection', 'overlaps']) this.editor.addEventListener(ev, bump);
     this.editor.addEventListener('toast', (e) => this.toast((e as CustomEvent).detail));
-    (window as unknown as { editor: Editor }).editor = this.editor;
+    Object.assign(window, { editor: this.editor, ITEMS });
     this.init();
   }
 
   private async init() {
-    try {
-      await loadKenney();
-    } catch (e) {
-      console.warn('Zusatzmodelle konnten nicht geladen werden', e);
-    }
+    const extra = await Promise.allSettled([loadKenney(), loadCults()]);
+    for (const r of extra) if (r.status === 'rejected') console.warn('Zusatzmodelle konnten nicht geladen werden', r.reason);
     this.itemThumbs = renderItemThumbs(ITEMS);
     this.ready = true;
     const params = new URLSearchParams(location.search);
@@ -267,7 +265,7 @@ export class PmApp extends LitElement {
         <div class="items">
           <div class="cathead">${cat.icon} ${cat.name}</div>
           <div class="hint">Ziehe es ins Haus – oder tippe drauf.</div>
-          ${cat.kind === 'item' ? html`<div class="credit">Mit Möbeln aus dem Furniture Kit von Kenney (CC0)</div>` : nothing}
+          ${cat.kind === 'item' ? html`<div class="credit">Mit Möbeln aus dem Furniture Kit von Kenney (CC0)${cat.id === 'garten' ? html`<br />${CULTS_CREDIT}` : nothing}</div>` : nothing}
           <div class="grid">${tiles}</div>
         </div>
       </div>
