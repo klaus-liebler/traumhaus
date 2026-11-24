@@ -938,19 +938,30 @@ function bike(c: number) {
   }
   // Sattel
   tube(seat, P(-0.24, 0.94), 0.013, SILVER, 0, metal);
-  b.box(0.24, 0.05, 0.13, -0.24, 0.97, 0, DARK, 0.025);
-  b.sph(0.06, -0.32, 0.97, 0, DARK, 1, 0.45, 1.1);
+  const SADDLE = 0x8b5a2b;
+  b.box(0.24, 0.05, 0.13, -0.24, 0.97, 0, SADDLE, 0.025);
+  b.sph(0.06, -0.32, 0.97, 0, SADDLE, 1, 0.45, 1.1);
+  // Gepäckträger hinten
+  for (const z of [-0.07, 0.07]) {
+    tube(P(-0.25, 0.8), P(-0.92, 0.8), 0.01, c, z);
+    tube(P(-0.88, 0.8), rear, 0.009, c, z);
+  }
+  for (const x of [-0.4, -0.6, -0.8]) b.cyl(0.008, 0.008, 0.14, x, 0.8, 0, c, 6).rotation.x = Math.PI / 2;
+  b.cyl(0.01, 0.01, 0.15, -0.92, 0.8, 0, c, 6).rotation.x = Math.PI / 2;
   // Lenker
   tube(headTop, P(0.39, 1.08), 0.015, SILVER, 0, metal);
   b.cyl(0.014, 0.014, 0.5, 0.38, 1.08, 0, SILVER, 8, metal).rotation.x = Math.PI / 2;
   for (const z of [-0.24, 0.24]) {
-    const g = b.cyl(0.022, 0.022, 0.1, 0.35, 1.08, z, L(c, 0.3), 10);
+    const g = b.cyl(0.022, 0.022, 0.1, 0.35, 1.08, z, SADDLE, 10);
     g.rotation.x = Math.PI / 2;
   }
   b.sph(0.025, 0.41, 1.1, 0.18, SILVER, 1, 1, 1, metal); // Klingel
   // Körbchen vorne
-  b.box(0.24, 0.17, 0.3, 0.64, 0.96, 0, L(c, 0.45), 0.03);
-  b.box(0.2, 0.02, 0.26, 0.64, 1.05, 0, D(c, -0.1), 0.01);
+  // Weidenkorb
+  const WICKER = 0xc8935a;
+  b.box(0.24, 0.17, 0.3, 0.64, 0.96, 0, WICKER, 0.03);
+  for (const y of [0.92, 0.98]) b.box(0.25, 0.012, 0.31, 0.64, y, 0, D(WICKER, -0.15), 0.004);
+  b.box(0.2, 0.02, 0.26, 0.64, 1.05, 0, D(WICKER, -0.3), 0.01);
   b.sph(0.05, 0.62, 1.07, 0.05, RED);
   b.sph(0.045, 0.68, 1.07, -0.06, YELLOW);
   tube(headMid, P(0.53, 0.9), 0.01, SILVER, 0, metal);
@@ -961,12 +972,22 @@ function bike(c: number) {
     arm.rotation.z = sgn * 0.6;
     b.box(0.1, 0.025, 0.07, bb.x + sgn * 0.08, bb.y - sgn * 0.12, sgn * 0.12, DARK, 0.01);
   }
+  // Nabenschaltung: dicke Hinterradnabe, ein Ritzel, Kette, Schaltzug zum Drehgriff rechts
+  b.cyl(0.055, 0.055, 0.09, rear.x, rear.y, 0, SILVER, 16, metal).rotation.x = Math.PI / 2;
+  b.cyl(0.042, 0.042, 0.012, rear.x, rear.y, 0.06, D(SILVER, -0.2), 14, metal).rotation.x = Math.PI / 2;
+  tube(P(bb.x, bb.y + 0.068), P(rear.x, rear.y + 0.04), 0.007, DARK, 0.06);
+  tube(P(bb.x, bb.y - 0.068), P(rear.x, rear.y - 0.04), 0.007, DARK, 0.06);
+  b.cyl(0.1, 0.1, 0.012, bb.x, bb.y, 0.072, c, 24).rotation.x = Math.PI / 2; // runder Kettenradschutz
+  b.cyl(0.026, 0.026, 0.07, 0.35, 1.08, 0.17, D(DARK, 0.2), 12).rotation.x = Math.PI / 2; // Drehgriff
+  for (const [p0, p1] of [[P(0.36, 1.06), headMid], [headMid, P(bb.x + 0.04, bb.y + 0.05)], [P(bb.x, bb.y + 0.03), rear]])
+    tube(p0, p1, 0.004, DARK, 0.035);
   // Kettenschutz und Schutzbleche
   const guard = b.box(0.5, 0.06, 0.02, (bb.x + rear.x) / 2, (bb.y + rear.y) / 2 + 0.02, 0.07, c, 0.02);
   guard.rotation.z = Math.atan2(rear.y - bb.y, rear.x - bb.x) + Math.PI;
   for (const w of [rear, front]) {
-    const mg = b.torus(R + 0.045, 0.025, w.x, w.y, 0, c, Math.PI * 0.5);
-    mg.rotation.z = w === front ? Math.PI * 0.06 : Math.PI * 0.28; // vorne weit nach vorn, hinten über Rad und Heck
+    // wie beim Hollandrad: vorne von oben bis hinunter auf Nabenhöhe hinten, hinten vom Sattelrohr bis weit nach hinten
+    const mg = b.torus(R + 0.045, 0.025, w.x, w.y, 0, c, w === front ? Math.PI * 0.58 : Math.PI * 0.7);
+    mg.rotation.z = w === front ? Math.PI * 0.47 : Math.PI * 0.245;
     mg.scale.z = 1.6;
   }
   // Ständer, damit es nicht umkippt
