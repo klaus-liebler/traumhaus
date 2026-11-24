@@ -147,6 +147,9 @@ export class Editor extends EventTarget {
       this.scene.remove(this.house.group);
       this.house.dispose();
     }
+    this.setFaded(new Set());
+    this.fadeCache.forEach((m) => m.dispose());
+    this.fadeCache.clear();
     const h = (this.house = buildHouse(def));
     this.scene.add(h.group);
     this.covers = {};
@@ -246,6 +249,7 @@ export class Editor extends EventTarget {
       this.droneView.target.copy(this.orbit.target);
     }
     this.mode = m;
+    this.setFaded(new Set());
     this.orbit.enabled = m === 'drone';
     if (m === 'drone') {
       this.camera.position.copy(this.droneView.pos);
@@ -999,19 +1003,77 @@ export class Editor extends EventTarget {
       const target = new THREE.Vector3(f.x, f.y + 1.35, f.z);
       const dir = new THREE.Vector3(Math.sin(f.yaw) * Math.cos(f.camPitch), Math.sin(f.camPitch), Math.cos(f.yaw) * Math.cos(f.camPitch));
       let dist = 3.4;
+      const fade = new Set<THREE.Mesh>();
       if (this.house) {
+        // Böden und Decken holen die Kamera näher heran ...
         this.ray.set(target, dir.clone().negate());
         this.ray.far = dist;
-        const occ = this.ray.intersectObjects(this.house.occluders.filter((o) => this.shown(o)), false)[0];
+        const slabs = [...this.house.floors, ...this.house.ceilings].filter((o) => this.shown(o));
+        const occ = this.ray.intersectObjects(slabs, false)[0];
+        if (occ) dist = Math.max(0.6, occ.distance - 0.2);
+        // ... Wände und Möbel dazwischen werden durchsichtig
+        const cam = target.clone().addScaledVector(dir, -dist);
+        const walls = this.house.walls.filter((o) => this.shown(o));
+        const furn: THREE.Object3D[] = [];
+        for (const it of this.items) if (it.visible) it.userData.model.traverse((o) => (o as THREE.Mesh).isMesh && furn.push(o));
+        for (const h of [0.15, 0.8, 1.35, 1.7]) {
+          const from = new THREE.Vector3(f.x, f.y + h, f.z);
+          const to = cam.clone().sub(from);
+          const len = to.length();
+          this.ray.set(from, to.normalize());
+          this.ray.far = len + 0.3;
+          for (const hit of this.ray.intersectObjects([...walls, ...furn], false)) {
+            const m = hit.object as THREE.Mesh;
+            const it = m.userData.item as Item | undefined;
+            if (it) it.userData.model.traverse((o) => (o as THREE.Mesh).isMesh && fade.add(o as THREE.Mesh));
+            else fade.add(m);
+          }
+        }
         this.ray.far = Infinity;
-        if (occ) dist = Math.max(0.4, occ.distance - 0.2);
       }
+      this.setFaded(fade);
       const want = target.clone().addScaledVector(dir, -dist);
       if (Number.isNaN(this.camPos.x)) this.camPos.copy(want);
       else this.camPos.lerp(want, Math.min(1, dt * 10));
       if (this.camPos.distanceTo(target) > dist + 0.05) this.camPos.copy(want);
       this.camera.position.copy(this.camPos);
       this.camera.lookAt(target);
+    }
+  }
+
+  private faded = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+  private fadeCache = new Map<THREE.Material, THREE.Material>();
+  /** Macht genau die übergebenen Meshes durchsichtig, alle anderen wieder normal */
+  private setFaded(set: Set<THREE.Mesh>) {
+    for (const [m, orig] of this.faded)
+      if (!set.has(m)) {
+        m.material = orig;
+        this.faded.delete(m);
+      }
+    const ghost = (mt: THREE.Material) => {
+      let g = this.fadeCache.get(mt);
+      if (!g) {
+        g = mt.clone();
+        g.transparent = true;
+        g.opacity = 0.18;
+        g.depthWrite = false;
+        this.fadeCache.set(mt, g);
+      }
+      const src = mt as THREE.MeshStandardMaterial, dst = g as THREE.MeshStandardMaterial;
+      if (dst.map !== src.map) {
+        dst.map = src.map;
+        dst.needsUpdate = true;
+      }
+      if (src.emissive) {
+        dst.emissive.copy(src.emissive);
+        dst.emissiveIntensity = src.emissiveIntensity;
+      }
+      return g;
+    };
+    for (const m of set) {
+      if (this.faded.has(m)) continue;
+      this.faded.set(m, m.material);
+      m.material = Array.isArray(m.material) ? m.material.map(ghost) : ghost(m.material);
     }
   }
 
