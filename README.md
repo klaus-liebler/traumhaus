@@ -23,6 +23,8 @@ Direkt in ein Haus springen: `?haus=sonnenhaus`, `?haus=villa`, `?haus=strandhau
 - **Kollision**: Wände sperren die Bewegung (Gegenstand wird herausgeschoben bzw. bleibt stehen), Überschneidungen mit anderen Gegenständen leuchten rot.
 - **Ansicht**: Wände niedrig (Schnittansicht), Dach ein/aus, Etagen ausblenden.
 - **Speichern**: automatisch pro Haus im `localStorage`.
+- **Märchenschloss** mit Türmen, Zinnen, Erkern und Tor.
+- **Zusatzmöbel**: 116 Modelle aus dem Furniture Kit von Kenney (CC0, www.kenney.nl), Quelle in `assets-src/kenney/`, gebündelt mit `npm run models`.
 
 ## Aufbau
 

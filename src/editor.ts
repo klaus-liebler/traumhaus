@@ -296,6 +296,9 @@ export class Editor extends EventTarget {
     h.roof.visible = this.roofOn && this.activeTop === h.levels - 1;
     h.clipPlanes.forEach((p, i) => (p.constant = this.lowWalls ? i * H + 1.15 : 1000));
     h.windows.forEach((w) => (w.visible = !this.lowWalls));
+    const full = this.activeTop === h.levels - 1;
+    h.decorClip.constant = this.lowWalls ? 1.15 + this.activeTop * H : full ? 1000 : (this.activeTop + 1) * H;
+    h.decorTop.visible = !this.lowWalls && full;
     for (const it of this.items) it.visible = this.levelOf(it) <= this.activeTop;
   }
 

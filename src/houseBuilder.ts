@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { HouseDef, RoomDef, StairDef } from './houses';
 import type { Rect } from './collision';
-import { GRASS, RAW, plaster, roofTiles, textureFor, type Covering } from './textures';
+import { GRASS, RAW, plaster, stoneWall, roofTiles, textureFor, type Covering } from './textures';
 
 export const H = 2.7; // Etagenhöhe
 export const T = 0.2; // Wandstärke
@@ -23,6 +23,8 @@ export interface HouseModel {
   colliders: Collider[];
   clipPlanes: THREE.Plane[];
   windows: THREE.Group[];
+  decorClip: THREE.Plane;
+  decorTop: THREE.Group;
   levels: number;
   center: THREE.Vector3;
   size: THREE.Vector3;
@@ -56,13 +58,14 @@ export function buildHouse(def: HouseDef): HouseModel {
   const colliders: Collider[] = [];
   const clipPlanes: THREE.Plane[] = [];
   const windows: THREE.Group[] = [];
+  const outerRuns: (Run & { out: number })[] = [];
   const disposables: { dispose(): void }[] = [];
   const stairs = def.stairs ?? [];
 
   // ---------- Materialverwaltung ----------
   const registry = new Map<string, THREE.MeshStandardMaterial[]>();
   const current = new Map<string, Covering>();
-  const outside = plaster(def.wallColor);
+  const outside = def.facade === 'stone' ? stoneWall(def.wallColor) : plaster(def.wallColor);
   const defaultCovering = (key: string): Covering => {
     if (key === 'wall:outside') return outside;
     return RAW[key.split(':')[0]] ?? RAW.wall;
@@ -177,6 +180,7 @@ export function buildHouse(def: HouseDef): HouseModel {
     }
 
     // ---------- Wände bauen ----------
+    if (L === levels - 1) for (const run of runs) if (run.pos === 'outside' || run.neg === 'outside') outerRuns.push({ ...run, out: run.pos === 'outside' ? 1 : -1 });
     for (const run of runs) {
       const keyP = run.pos === 'outside' ? 'wall:outside' : 'wall:' + run.pos;
       const keyN = run.neg === 'outside' ? 'wall:outside' : 'wall:' + run.neg;
@@ -429,6 +433,7 @@ export function buildHouse(def: HouseDef): HouseModel {
       roof.add(m);
     }
   } else {
+    // flaches Dach (auch Schloss)
     for (const r of top) {
       const g = new THREE.BoxGeometry(r.w + T + 0.4, 0.25, r.d + T + 0.4);
       g.translate(r.x + r.w / 2, topY + 0.125, r.z + r.d / 2);
@@ -441,6 +446,106 @@ export function buildHouse(def: HouseDef): HouseModel {
     }
   }
   group.add(roof);
+
+  // ---------- Schloss-Deko: Zinnen, Türme, Erker, Tor ----------
+  const decorClip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1000);
+  const decor = new THREE.Group();
+  const decorTop = new THREE.Group();
+  group.add(decor, decorTop);
+  if (def.roof === 'castle' || def.towers || def.oriels || def.gate) {
+    const stoneTex = textureFor(outside);
+    const stone = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.9, clippingPlanes: [decorClip], clipShadows: true, side: THREE.DoubleSide, shadowSide: THREE.BackSide });
+    const stoneTop = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.9 });
+    const coneMat = new THREE.MeshStandardMaterial({ color: def.towerRoofColor ?? def.roofColor, roughness: 0.55 });
+    const glassD = new THREE.MeshStandardMaterial({ color: 0x8fd0f0, roughness: 0.15, emissive: 0x204060, emissiveIntensity: 0.25, clippingPlanes: [decorClip] });
+    const darkWin = new THREE.MeshStandardMaterial({ color: 0x4a3d6b, roughness: 0.6, clippingPlanes: [decorClip] });
+    const flagMat = new THREE.MeshStandardMaterial({ color: 0xffd23f, side: THREE.DoubleSide, roughness: 0.6 });
+    const gold = new THREE.MeshStandardMaterial({ color: 0xf2c14e, metalness: 0.4, roughness: 0.35 });
+    disposables.push(stone, stoneTop, coneMat, glassD, darkWin, flagMat, gold);
+    const add = (geo: THREE.BufferGeometry, m: THREE.Material, parent: THREE.Object3D, x: number, y: number, z: number) => {
+      disposables.push(geo);
+      const me = new THREE.Mesh(geo, m);
+      me.position.set(x, y, z);
+      me.castShadow = true;
+      me.receiveShadow = true;
+      parent.add(me);
+      return me;
+    };
+    // Zinnen auf allen Außenmauern
+    if (def.roof === 'castle')
+      for (const r of outerRuns) {
+        const a = r.a - T / 2, b = r.b + T / 2, len = b - a;
+        const off = r.out * 0.0;
+        const pg = r.horiz ? new THREE.BoxGeometry(len, 0.45, T) : new THREE.BoxGeometry(T, 0.45, len);
+        add(pg, stoneTop, decorTop, r.horiz ? (a + b) / 2 : r.c + off, topY + 0.225, r.horiz ? r.c + off : (a + b) / 2);
+        const n = Math.max(2, Math.round(len / 0.9));
+        for (let i = 0; i < n; i++) {
+          const t = a + (len / n) * (i + 0.5);
+          const mg = r.horiz ? new THREE.BoxGeometry(len / n / 2, 0.45, T + 0.02) : new THREE.BoxGeometry(T + 0.02, 0.45, len / n / 2);
+          add(mg, stoneTop, decorTop, r.horiz ? t : r.c, topY + 0.675, r.horiz ? r.c : t);
+        }
+      }
+    // Türme
+    for (const tw of def.towers ?? []) {
+      add(new THREE.CylinderGeometry(tw.r, tw.r * 1.06, tw.h, 28), stone, decor, tw.x, tw.h / 2, tw.z);
+      // Fensterchen
+      for (let k = 0; k < 3; k++) {
+        const y = 1.6 + k * 2.4;
+        if (y > tw.h - 1) break;
+        for (let j = 0; j < 4; j++) {
+          const a = (j / 4) * Math.PI * 2 + Math.PI / 4 + k * 0.4;
+          const w = add(new THREE.BoxGeometry(0.32, 0.6, 0.08), darkWin, decor, tw.x + Math.sin(a) * (tw.r + 0.01), y, tw.z + Math.cos(a) * (tw.r + 0.01));
+          w.rotation.y = a;
+          const top = add(new THREE.CircleGeometry(0.16, 12, 0, Math.PI), darkWin, decor, tw.x + Math.sin(a) * (tw.r + 0.05), y + 0.3, tw.z + Math.cos(a) * (tw.r + 0.05));
+          top.rotation.y = a;
+        }
+      }
+      add(new THREE.CylinderGeometry(tw.r + 0.18, tw.r + 0.05, 0.35, 28), stoneTop, decorTop, tw.x, tw.h + 0.1, tw.z);
+      for (let j = 0; j < 10; j++) {
+        const a = (j / 10) * Math.PI * 2;
+        const m = add(new THREE.BoxGeometry(0.32, 0.4, 0.22), stoneTop, decorTop, tw.x + Math.sin(a) * (tw.r + 0.08), tw.h + 0.47, tw.z + Math.cos(a) * (tw.r + 0.08));
+        m.rotation.y = a;
+      }
+      const ch = tw.r * 2.4;
+      add(new THREE.ConeGeometry(tw.r + 0.12, ch, 28), coneMat, decorTop, tw.x, tw.h + 0.25 + ch / 2, tw.z);
+      const pole = tw.h + 0.25 + ch;
+      add(new THREE.CylinderGeometry(0.025, 0.025, 0.9, 6), gold, decorTop, tw.x, pole + 0.4, tw.z);
+      add(new THREE.SphereGeometry(0.07, 10, 8), gold, decorTop, tw.x, pole + 0.88, tw.z);
+      const fg = new THREE.BufferGeometry();
+      fg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0.6, -0.15, 0, 0, -0.32, 0], 3));
+      fg.computeVertexNormals();
+      add(fg, flagMat, decorTop, tw.x + 0.02, pole + 0.8, tw.z);
+      for (let L = 0; L < levels; L++) colliders.push({ rect: { cx: tw.x, cz: tw.z, hx: tw.r * 0.88, hz: tw.r * 0.88, rot: 0, y0: L * H, y1: L * H + H }, level: L });
+    }
+    // Erker
+    for (const o of def.oriels ?? []) {
+      const g = new THREE.Group();
+      const y0 = o.level * H + 0.5, hh = 1.7, w = 1.6, d = 0.75;
+      add(new THREE.BoxGeometry(w, hh, d), stone, g, 0, hh / 2, d / 2);
+      for (const sx of [-1, 0, 1]) {
+        const gw = sx === 0 ? add(new THREE.BoxGeometry(0.7, 0.9, 0.04), glassD, g, 0, hh / 2 + 0.1, d + 0.01) : add(new THREE.BoxGeometry(0.04, 0.9, 0.4), glassD, g, sx * (w / 2 + 0.01), hh / 2 + 0.1, d / 2);
+        void gw;
+      }
+      const cone = add(new THREE.ConeGeometry(w * 0.72, 1.1, 4), coneMat, g, 0, hh + 0.55, d / 2);
+      cone.rotation.y = Math.PI / 4;
+      cone.scale.set(1, 1, (d + 0.2) / w * 1.4);
+      const cor = add(new THREE.ConeGeometry(w * 0.5, 0.7, 4), stone, g, 0, -0.35, d / 2);
+      cor.rotation.set(Math.PI, Math.PI / 4, 0);
+      cor.scale.set(1, 1, 0.6);
+      const ang = { 'z+': 0, 'x+': Math.PI / 2, 'z-': Math.PI, 'x-': -Math.PI / 2 }[o.side];
+      g.rotation.y = ang;
+      g.position.set(o.x + Math.sin(ang) * (T / 2), y0, o.z + Math.cos(ang) * (T / 2));
+      decor.add(g);
+    }
+    // Tor mit Bogen
+    if (def.gate) {
+      const gt = def.gate, gw = gt.w / 2 + 0.25;
+      for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.4, 2.3, 0.5), stone, decor, gt.x + s * gw, 1.15, gt.z + 0.2);
+      const arch = add(new THREE.TorusGeometry(gw, 0.2, 10, 24, Math.PI), stone, decor, gt.x, 2.3, gt.z + 0.2);
+      arch.scale.z = 1.25;
+      add(new THREE.BoxGeometry(0.5, 0.3, 0.08), gold, decor, gt.x, 2.3 + gw + 0.05, gt.z + 0.47);
+    }
+  }
 
   // ---------- Boden draußen ----------
   const gGeo = new THREE.PlaneGeometry(90, 90);
@@ -485,7 +590,7 @@ export function buildHouse(def: HouseDef): HouseModel {
   };
 
   const model: HouseModel = {
-    def, group, levelGroups, roof, windows, walls, floors, ceilings, ground, occluders, colliders, clipPlanes, levels, center, size,
+    def, group, levelGroups, roof, windows, decorClip, decorTop, walls, floors, ceilings, ground, occluders, colliders, clipPlanes, levels, center, size,
     roomAt: (x, z, level) => roomAt(x, z, level, 0.1),
     groundY,
     defaultCovering,

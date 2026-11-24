@@ -4,6 +4,7 @@ import { HOUSES, type HouseDef } from './houses';
 import { CATEGORIES, ITEMS, type Category } from './catalog';
 import { COVERINGS, coveringThumb } from './textures';
 import { renderHouseThumbs, renderItemThumbs } from './thumbs';
+import { loadKenney } from './kenney';
 
 export class PmApp extends LitElement {
   static properties = {
@@ -14,6 +15,7 @@ export class PmApp extends LitElement {
     ghost: { state: true },
     helpOpen: { state: true },
     confirmClear: { state: true },
+    ready: { state: true },
   };
 
   declare screen: 'select' | 'edit';
@@ -23,6 +25,7 @@ export class PmApp extends LitElement {
   declare ghost: { x: number; y: number; src: string } | null;
   declare helpOpen: boolean;
   declare confirmClear: boolean;
+  declare ready: boolean;
 
   private editor!: Editor;
   private house: HouseDef | null = null;
@@ -41,7 +44,7 @@ export class PmApp extends LitElement {
     this.ghost = null;
     this.helpOpen = false;
     this.confirmClear = false;
-    this.itemThumbs = renderItemThumbs(ITEMS);
+    this.ready = false;
     for (const c of COVERINGS) this.coverThumbs.set(c.id, coveringThumb(c));
     this.houseThumbs = renderHouseThumbs(HOUSES);
     window.addEventListener('pointermove', (e) => this.onDragMove(e));
@@ -57,6 +60,17 @@ export class PmApp extends LitElement {
     for (const ev of ['change', 'selection', 'overlaps']) this.editor.addEventListener(ev, bump);
     this.editor.addEventListener('toast', (e) => this.toast((e as CustomEvent).detail));
     (window as unknown as { editor: Editor }).editor = this.editor;
+    this.init();
+  }
+
+  private async init() {
+    try {
+      await loadKenney();
+    } catch (e) {
+      console.warn('Zusatzmodelle konnten nicht geladen werden', e);
+    }
+    this.itemThumbs = renderItemThumbs(ITEMS);
+    this.ready = true;
     const params = new URLSearchParams(location.search);
     const h = HOUSES.find((x) => x.id === params.get('haus'));
     if (h) this.open(h);
@@ -162,12 +176,12 @@ export class PmApp extends LitElement {
         <div class="cards">
           ${HOUSES.map(
             (h) => html`
-              <button class="card" @click=${() => this.open(h)}>
+              <button class="card" ?disabled=${!this.ready} @click=${() => this.open(h)}>
                 <img src=${this.houseThumbs.get(h.id) ?? ''} alt="" />
                 <div class="cardbody">
                   <h2>${h.emoji} ${h.name}</h2>
                   <p>${h.description}</p>
-                  <span class="go">${this.editor?.hasSave(h.id) ? 'Weiter einrichten ➜' : 'Einziehen ➜'}</span>
+                  <span class="go">${!this.ready ? 'Möbel werden geladen …' : this.editor?.hasSave(h.id) ? 'Weiter einrichten ➜' : 'Einziehen ➜'}</span>
                 </div>
               </button>
             `,
@@ -253,6 +267,7 @@ export class PmApp extends LitElement {
         <div class="items">
           <div class="cathead">${cat.icon} ${cat.name}</div>
           <div class="hint">Ziehe es ins Haus – oder tippe drauf.</div>
+          ${cat.kind === 'item' ? html`<div class="credit">Mit Möbeln aus dem Furniture Kit von Kenney (CC0)</div>` : nothing}
           <div class="grid">${tiles}</div>
         </div>
       </div>
@@ -396,6 +411,7 @@ export class PmApp extends LitElement {
     .items { flex: 1; overflow-y: auto; padding: 8px; }
     .cathead { font-size: 20px; font-weight: 600; }
     .hint { font-size: 12px; opacity: 0.7; margin-bottom: 8px; }
+    .credit { font-size: 10.5px; opacity: 0.55; margin: -4px 0 8px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
     .tile {
       background: #fff; border-radius: 16px; padding: 6px; text-align: center; cursor: grab;

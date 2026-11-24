@@ -8,7 +8,12 @@ export interface HouseDef {
   name: string;
   description: string;
   emoji: string;
-  roof: 'gable' | 'flat';
+  roof: 'gable' | 'flat' | 'castle';
+  facade?: 'stone';
+  towers?: { x: number; z: number; r: number; h: number }[];
+  oriels?: { level: number; x: number; z: number; side: 'x-' | 'x+' | 'z-' | 'z+' }[];
+  gate?: { x: number; z: number; w: number };
+  towerRoofColor?: number;
   wallColor: number;
   roofColor: number;
   rooms: RoomDef[];
@@ -96,5 +101,52 @@ export const HOUSES: HouseDef[] = [
       win(0, 0, 9), win(0, 2, 11, 1.6), win(0, 4, 9),
     ],
     spawn: { x: 6.5, z: 6.5, yaw: -Math.PI / 2 },
+  },
+  {
+    id: 'schloss',
+    name: 'Märchenschloss',
+    description: 'Schloss mit vier Türmchen, Zinnen, Erkern, Thronsaal und Prinzessinnenzimmer.',
+    emoji: '🏰',
+    roof: 'castle',
+    facade: 'stone',
+    wallColor: 0xf6e3ee,
+    roofColor: 0xd9cfe0,
+    towerRoofColor: 0xe0609c,
+    rooms: [
+      R('halle', 'Thronsaal', 0, 4, 3, 6, 7),
+      R('galerie', 'Galerie', 0, 4, 0, 6, 3),
+      R('kueche', 'Schlossküche', 0, 0, 0, 4, 5),
+      R('speise', 'Speisesaal', 0, 0, 5, 4, 5),
+      R('bibliothek', 'Bibliothek', 0, 10, 0, 4, 5),
+      R('musik', 'Musikzimmer', 0, 10, 5, 4, 5),
+      R('galerie1', 'Galerie oben', 1, 4, 0, 6, 3),
+      R('prinz', 'Prinzessinnenzimmer', 1, 4, 3, 6, 7),
+      R('ankleide', 'Ankleidezimmer', 1, 0, 5, 4, 5),
+      R('bad1', 'Königliches Bad', 1, 0, 0, 4, 5),
+      R('gast', 'Gästezimmer', 1, 10, 0, 4, 5),
+      R('spiel', 'Spielzimmer', 1, 10, 5, 4, 5),
+    ],
+    openings: [
+      door(0, 7, 10, 1.6), door(0, 6.5, 3, 1.2), door(0, 4, 7.5), door(0, 2, 5), door(0, 4, 1.5), door(0, 10, 7.5), door(0, 10, 1.5), door(0, 12, 5),
+      win(0, 2, 0), win(0, 0, 2.5), win(0, 0, 7.5), win(0, 2, 10), win(0, 12, 0), win(0, 14, 2.5), win(0, 14, 7.5), win(0, 12, 10),
+      win(0, 5, 10, 1.0), win(0, 9, 10, 1.0),
+      door(1, 6.5, 3, 1.2), door(1, 4, 7.5), door(1, 2, 5), door(1, 4, 1.5), door(1, 10, 1.5), door(1, 10, 7.5), door(1, 12, 5),
+      win(1, 2, 0), win(1, 0, 7.5), win(1, 2, 10), win(1, 12, 0), win(1, 14, 7.5), win(1, 12, 10),
+      win(1, 5.5, 10), win(1, 8.5, 10),
+    ],
+    stairs: [{ level: 0, x: 5, z: 1, w: 4, d: 1, dir: 'x+' }],
+    towers: [
+      { x: -0.9, z: -0.9, r: 1.25, h: 7.6 },
+      { x: 14.9, z: -0.9, r: 1.25, h: 7.6 },
+      { x: -0.9, z: 10.9, r: 1.25, h: 7.6 },
+      { x: 14.9, z: 10.9, r: 1.25, h: 7.6 },
+      { x: 7, z: -1.2, r: 1.0, h: 9.2 },
+    ],
+    oriels: [
+      { level: 1, x: 0, z: 2.5, side: 'x-' },
+      { level: 1, x: 14, z: 2.5, side: 'x+' },
+    ],
+    gate: { x: 7, z: 10, w: 1.6 },
+    spawn: { x: 7, z: 13, yaw: Math.PI },
   },
 ];

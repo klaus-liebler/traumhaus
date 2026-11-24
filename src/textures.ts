@@ -305,6 +305,30 @@ export const RAW: Record<string, Covering> = {
   ceil: { id: 'raw-ceil', name: 'Rohbau', surface: 'ceil', scale: 2, draw: solid(0xe0ddd7, 0.08) },
 };
 
+export function stoneWall(color: number): Covering {
+  return {
+    id: 'stone-' + color.toString(16), name: 'Schlossmauer', surface: 'wall', scale: 2.4,
+    draw: (g, s) => {
+      const r = rng(31);
+      g.fillStyle = hex(shade(color, -0.18));
+      g.fillRect(0, 0, s, s);
+      const rows = 6, h = s / rows;
+      for (let y = 0; y < rows; y++) {
+        let x = y % 2 ? -s * 0.12 : 0;
+        while (x < s) {
+          const w = s * (0.2 + r() * 0.14);
+          g.fillStyle = hex(shade(color, (r() - 0.5) * 0.12));
+          g.beginPath();
+          g.roundRect(x + 2, y * h + 2, Math.min(w, s - x) - 4, h - 4, 5);
+          g.fill();
+          x += w;
+        }
+      }
+      noise(g, s, 0.05, 5);
+    },
+  };
+}
+
 export function plaster(color: number): Covering {
   return { id: 'plaster-' + color.toString(16), name: 'Putz', surface: 'wall', scale: 1.5, draw: solid(color, 0.06) };
 }
