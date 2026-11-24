@@ -836,11 +836,12 @@ function swing(c: number) {
   b.cyl(0.06, 0.06, 2.1, 0, top, 0, wood, 12).rotation.z = Math.PI / 2;
   // zwei Schaukeln
   for (const [x, col] of [[-0.45, c], [0.45, L(c, 0.35)]] as [number, number][]) {
-    for (const dz of [-0.17, 0.17]) {
-      b.cyl(0.008, 0.008, top - 0.5, x, (top + 0.5) / 2, dz, SILVER, 6, { metalness: 0.6, roughness: 0.3 });
-      b.torus(0.03, 0.008, x, top - 0.04, dz, SILVER).rotation.y = Math.PI / 2;
+    // Seile links und rechts am Sitz, Sitzbrett quer zur Schaukelrichtung
+    for (const dx of [-0.17, 0.17]) {
+      b.cyl(0.008, 0.008, top - 0.5, x + dx, (top + 0.5) / 2, 0, SILVER, 6, { metalness: 0.6, roughness: 0.3 });
+      b.torus(0.03, 0.008, x + dx, top - 0.04, 0, SILVER);
     }
-    b.box(0.22, 0.04, 0.46, x, 0.48, 0, col, 0.015);
+    b.box(0.42, 0.04, 0.2, x, 0.48, 0, col, 0.015);
   }
   return b.g;
 }
@@ -965,7 +966,7 @@ function bike(c: number) {
   guard.rotation.z = Math.atan2(rear.y - bb.y, rear.x - bb.x) + Math.PI;
   for (const w of [rear, front]) {
     const mg = b.torus(R + 0.045, 0.025, w.x, w.y, 0, c, Math.PI * 0.5);
-    mg.rotation.z = w === front ? Math.PI * 0.2 : Math.PI * 0.28;
+    mg.rotation.z = w === front ? Math.PI * 0.06 : Math.PI * 0.28; // vorne weit nach vorn, hinten über Rad und Heck
     mg.scale.z = 1.6;
   }
   // Ständer, damit es nicht umkippt
