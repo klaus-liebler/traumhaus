@@ -67,7 +67,11 @@ export function buildHouse(def: HouseDef): HouseModel {
     if (key === 'wall:outside') return outside;
     return RAW[key.split(':')[0]] ?? RAW.wall;
   };
+  const matCache = new Map<string, THREE.MeshStandardMaterial>();
   const getMat = (key: string, clip: THREE.Plane | null) => {
+    const ck = key + '|' + (clip ? clipPlanes.indexOf(clip) : 'n');
+    const cached = matCache.get(ck);
+    if (cached) return cached;
     const cov = defaultCovering(key);
     const m = new THREE.MeshStandardMaterial({ map: textureFor(cov), roughness: 0.85, side: clip ? THREE.DoubleSide : THREE.FrontSide, shadowSide: THREE.BackSide });
     if (clip) {
@@ -77,6 +81,7 @@ export function buildHouse(def: HouseDef): HouseModel {
     if (!registry.has(key)) registry.set(key, []);
     registry.get(key)!.push(m);
     disposables.push(m);
+    matCache.set(ck, m);
     return m;
   };
   const concrete: THREE.MeshStandardMaterial[] = [];
@@ -176,14 +181,7 @@ export function buildHouse(def: HouseDef): HouseModel {
       const keyP = run.pos === 'outside' ? 'wall:outside' : 'wall:' + run.pos;
       const keyN = run.neg === 'outside' ? 'wall:outside' : 'wall:' + run.neg;
       const mP = getMat(keyP, plane), mN = getMat(keyN, plane);
-      let s0 = run.a, s1 = run.b;
-      if (run.horiz) {
-        if (run.extA) s0 -= T / 2;
-        if (run.extB) s1 += T / 2;
-      } else {
-        s0 += T / 2;
-        s1 -= T / 2;
-      }
+      const s0 = run.a + T / 2, s1 = run.b - T / 2;
       // Material-Indizes: px, nx, py, ny, pz, nz
       const mats = run.horiz ? [conc, conc, conc, conc, mP, mN] : [mP, mN, conc, conc, conc, conc];
       const keys = run.horiz ? ['', '', '', '', keyP, keyN] : [keyP, keyN, '', '', '', ''];
@@ -239,6 +237,29 @@ export function buildHouse(def: HouseDef): HouseModel {
         s = ob;
       }
       piece(s, s1, y0, y1);
+    }
+
+    // ---------- Eckpfeiler an allen Knoten ----------
+    const nodes = new Map<string, [number, number]>();
+    for (const run of runs)
+      for (const s of [run.a, run.b]) {
+        const x = run.horiz ? s : run.c, z = run.horiz ? run.c : s;
+        nodes.set(r2(x) + ',' + r2(z), [x, z]);
+      }
+    const attached = (x: number, z: number, horiz: boolean, s: number) =>
+      runs.some((r) => r.horiz === horiz && Math.abs(r.c - (horiz ? z : x)) < 1e-6 && s > r.a && s < r.b);
+    for (const [x, z] of nodes.values()) {
+      const faceKey = (dx: number, dz: number) => {
+        const rr = roomStrict(x + dx * 0.15 + dz * 0.05, z + dz * 0.15 + dx * 0.05, L);
+        return rr ? 'wall:' + rr.id : 'wall:outside';
+      };
+      const dirs: [number, number, boolean][] = [[1, 0, attached(x, z, true, x + 0.15)], [-1, 0, attached(x, z, true, x - 0.15)], [0, 0, true], [0, 0, true], [0, 1, attached(x, z, false, z + 0.15)], [0, -1, attached(x, z, false, z - 0.15)]];
+      const keys = dirs.map(([dx, dz, att]) => (att ? '' : faceKey(dx, dz)));
+      const mats = keys.map((k) => (k ? getMat(k, plane) : conc));
+      const m = box(x - T / 2, x + T / 2, y0, y1, z - T / 2, z + T / 2, mats, lg);
+      m.userData = { kind: 'wall', keys, level: L };
+      walls.push(m);
+      colliders.push({ rect: { cx: x, cz: z, hx: T / 2, hz: T / 2, rot: 0, y0, y1 }, level: L });
     }
 
     // ---------- Böden & Decken ----------

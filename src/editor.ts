@@ -56,7 +56,7 @@ export class Editor extends EventTarget {
   covers: Record<string, string> = {};
 
   private figure = new Figure();
-  private fig = { x: 0, y: 0, z: 0, yaw: 0, pitch: -0.12, camPitch: -0.35 };
+  fig = { x: 0, y: 0, z: 0, yaw: 0, pitch: -0.12, camPitch: -0.35 };
   private keys = new Set<string>();
   private vkeys = { fwd: false, back: false, left: false, right: false };
   private ray = new THREE.Raycaster();
@@ -87,7 +87,7 @@ export class Editor extends EventTarget {
     this.scene.fog = new THREE.Fog(0xa9ddff, 45, 90);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.05, 200);
 
-    const hemi = new THREE.HemisphereLight(0xeaf6ff, 0xa9c98a, 1.6);
+    const hemi = new THREE.HemisphereLight(0xeaf6ff, 0xe6dccb, 1.7);
     this.scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xfff6e6, 2.2);
     sun.position.set(14, 22, 12);
@@ -184,7 +184,8 @@ export class Editor extends EventTarget {
     this.updateFigure(0, 0);
 
     const c = h.center;
-    const dist = Math.max(h.size.x, h.size.z) * 1.35 + 4;
+    const aspect = this.container.clientWidth / Math.max(1, this.container.clientHeight);
+    const dist = (Math.max(h.size.x, h.size.z) * 1.35 + 4) * Math.max(1, 1.2 / aspect);
     this.droneView.target.set(c.x, 1, c.z);
     this.droneView.pos.set(c.x + dist * 0.45, dist * 0.85, c.z + dist * 0.85);
     this.setMode('drone');
@@ -364,6 +365,41 @@ export class Editor extends EventTarget {
       if (!moved) return true;
     }
     return !this.wallHits(it);
+  }
+
+  /** Bewegt `it` von `from` Richtung `to`, bleibt aber vor Wänden stehen (gleitet entlang) */
+  private sweep(it: Item, from: THREE.Vector3, to: THREE.Vector3) {
+    if (it.userData.def.placement === 'wall') {
+      it.position.copy(to);
+      return;
+    }
+    const y = to.y;
+    const cur = from.clone();
+    cur.y = y;
+    it.position.copy(cur);
+    if (this.wallHits(it)) {
+      // schon in einer Wand (z. B. nach dem Drehen) – frei herausschieben lassen
+      it.position.copy(to);
+      this.resolveWalls(it);
+      return;
+    }
+    const d = new THREE.Vector3(to.x - cur.x, 0, to.z - cur.z);
+    const n = Math.max(1, Math.ceil(d.length() / 0.04));
+    const st = d.divideScalar(n);
+    for (let i = 0; i < n; i++) {
+      let moved = false;
+      for (const [mx, mz] of [[st.x, st.z], [st.x, 0], [0, st.z]]) {
+        if (!mx && !mz) continue;
+        it.position.set(cur.x + mx, y, cur.z + mz);
+        if (!this.wallHits(it)) {
+          cur.set(cur.x + mx, y, cur.z + mz);
+          moved = true;
+          break;
+        }
+      }
+      if (!moved) break;
+    }
+    it.position.copy(cur);
   }
 
   updateOverlaps() {
@@ -786,6 +822,11 @@ export class Editor extends EventTarget {
       const ex = new Set<THREE.Object3D>([it, ...d.stack]);
       const ok = this.placeAt(it, e.clientX, e.clientY, it.userData.def.placement === 'floor' ? d.offset : undefined, ex);
       if (!ok) it.position.copy(before);
+      else if (it.userData.def.placement !== 'wall') {
+        const target = it.position.clone();
+        this.sweep(it, before, target);
+        if (it.position.distanceToSquared(target) > 0.01) this.hint('Da ist eine Wand im Weg!');
+      }
       const delta = it.position.clone().sub(d.last);
       for (const s of d.stack) s.position.add(delta);
       d.last.copy(it.position);
@@ -845,7 +886,12 @@ export class Editor extends EventTarget {
     }
     let ok: boolean;
     if (this.gizmoMode === 'rotate') ok = !this.wallHits(it) || def.placement === 'wall';
-    else ok = this.resolveWalls(it);
+    else {
+      const target = it.position.clone();
+      this.sweep(it, this.lastValid.pos, target);
+      if (it.position.distanceToSquared(target) > 0.01) this.hint('Da ist eine Wand im Weg!');
+      ok = true;
+    }
     if (!ok) {
       it.position.copy(this.lastValid.pos);
       it.rotation.y = this.lastValid.rot;
@@ -886,6 +932,14 @@ export class Editor extends EventTarget {
       this.orbit.update();
       this.figure.animate(dt, 0);
     } else this.walk(dt);
+    const pulse = 0.45 + 0.35 * Math.sin(performance.now() / 160);
+    for (const it of this.items) {
+      if (!it.userData.colliding) continue;
+      it.userData.model.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+        if (m?.emissive) m.emissiveIntensity = pulse;
+      });
+    }
     const w = this.renderer.domElement.width;
     if (w > 0) this.renderer.render(this.scene, this.camera);
   }
@@ -961,6 +1015,14 @@ export class Editor extends EventTarget {
     }
   }
 
+  private insets = { left: 0, bottom: 0 };
+  /** Platz, den Bedienfelder verdecken – das Bild wird entsprechend verschoben */
+  setInsets(left: number, bottom: number) {
+    if (left === this.insets.left && bottom === this.insets.bottom) return;
+    this.insets = { left, bottom };
+    this.resize();
+  }
+
   private resize() {
     const w = this.container.clientWidth, h = this.container.clientHeight;
     if (!w || !h) return;
@@ -968,6 +1030,7 @@ export class Editor extends EventTarget {
     this.renderer.domElement.style.width = w + 'px';
     this.renderer.domElement.style.height = h + 'px';
     this.camera.aspect = w / h;
+    this.camera.setViewOffset(w, h, -this.insets.left / 2, this.insets.bottom / 2, w, h);
     this.camera.updateProjectionMatrix();
   }
 

@@ -13,6 +13,7 @@ export class PmApp extends LitElement {
     toastMsg: { state: true },
     ghost: { state: true },
     helpOpen: { state: true },
+    confirmClear: { state: true },
   };
 
   declare screen: 'select' | 'edit';
@@ -21,6 +22,7 @@ export class PmApp extends LitElement {
   declare toastMsg: string;
   declare ghost: { x: number; y: number; src: string } | null;
   declare helpOpen: boolean;
+  declare confirmClear: boolean;
 
   private editor!: Editor;
   private house: HouseDef | null = null;
@@ -38,12 +40,14 @@ export class PmApp extends LitElement {
     this.toastMsg = '';
     this.ghost = null;
     this.helpOpen = false;
+    this.confirmClear = false;
     this.itemThumbs = renderItemThumbs(ITEMS);
     for (const c of COVERINGS) this.coverThumbs.set(c.id, coveringThumb(c));
     this.houseThumbs = renderHouseThumbs(HOUSES);
     window.addEventListener('pointermove', (e) => this.onDragMove(e));
     window.addEventListener('pointerup', (e) => this.onDragEnd(e));
     window.addEventListener('pointercancel', () => this.onDragCancel());
+    window.addEventListener('resize', () => this.requestUpdate());
   }
 
   firstUpdated() {
@@ -56,6 +60,17 @@ export class PmApp extends LitElement {
     const params = new URLSearchParams(location.search);
     const h = HOUSES.find((x) => x.id === params.get('haus'));
     if (h) this.open(h);
+  }
+
+  updated() {
+    const tb = this.renderRoot.querySelector('.topbar') as HTMLElement | null;
+    if (tb) this.style.setProperty('--tbh', tb.offsetHeight + 16 + 'px');
+    const cat = this.renderRoot.querySelector('.catalog') as HTMLElement | null;
+    if (cat && this.editor) {
+      const r = cat.getBoundingClientRect();
+      const narrow = window.innerWidth <= 760;
+      this.editor.setInsets(narrow ? 0 : r.right, narrow ? window.innerHeight - r.top : 0);
+    }
   }
 
   private open(h: HouseDef) {
@@ -184,7 +199,7 @@ export class PmApp extends LitElement {
           <button class="tb ${ed.roofOn ? 'on' : ''}" @click=${() => ed.setRoof(!ed.roofOn)}><span>🏠</span>Dach</button>
           <button class="tb ${ed.autoTour ? 'on' : ''}" @click=${() => ed.setAutoTour(!ed.autoTour)}><span>🔄</span>Rundflug</button>
           <button class="tb" @click=${() => (this.helpOpen = !this.helpOpen)}><span>❓</span>Hilfe</button>
-          <button class="tb" @click=${() => { if (confirm('Wirklich alles ausräumen?')) ed.clearAll(); }}><span>🧹</span>Ausräumen</button>
+          <button class="tb ${this.confirmClear ? 'on' : ''}" @click=${() => (this.confirmClear = !this.confirmClear)}><span>🧹</span>Ausräumen</button>
         </div>
       </div>
       ${this.renderCatalog()} ${this.renderSelection()}
@@ -193,6 +208,18 @@ export class PmApp extends LitElement {
         ? html`<div class="warn">🔴 ${ed.collidingCount} Sachen stoßen zusammen</div>`
         : nothing}
       ${this.helpOpen ? this.renderHelp() : nothing}
+      ${this.confirmClear
+        ? html`<div class="help" @click=${() => (this.confirmClear = false)}>
+            <div class="helpbox" @click=${(e: Event) => e.stopPropagation()}>
+              <h2>Alles ausräumen?</h2>
+              <p>Alle Möbel und Beläge in diesem Haus werden entfernt.</p>
+              <div style="display:flex;gap:8px">
+                <button class="sb del" @click=${() => { ed.clearAll(); this.confirmClear = false; }}>🧹 Ja, ausräumen</button>
+                <button class="sb" @click=${() => (this.confirmClear = false)}>Nein, behalten</button>
+              </div>
+            </div>
+          </div>`
+        : nothing}
     `;
   }
 
@@ -357,7 +384,7 @@ export class PmApp extends LitElement {
     .tb.back { background: #fff; box-shadow: 0 3px 0 #f3b3cb; }
 
     .catalog {
-      position: absolute; left: 8px; top: 64px; bottom: 8px;
+      position: absolute; left: 8px; top: var(--tbh, 64px); bottom: 8px;
       width: 330px; display: flex; background: var(--panel); border-radius: 22px; overflow: hidden;
       box-shadow: 0 8px 24px rgba(60, 30, 80, 0.15);
     }
@@ -391,7 +418,7 @@ export class PmApp extends LitElement {
     .sb.del { background: #ffe0e0; }
     .sb.x { background: transparent; box-shadow: none; }
     .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #ccc; display: inline-block; }
-    .warn { position: absolute; right: 12px; top: 64px; background: #ff4d4d; color: #fff; padding: 6px 14px; border-radius: 14px; font-weight: 600; }
+    .warn { position: absolute; right: 12px; top: var(--tbh, 64px); background: #ff4d4d; color: #fff; padding: 6px 14px; border-radius: 14px; font-weight: 600; }
     .toast {
       position: fixed; left: 50%; top: 72px; transform: translateX(-50%); background: #fff; padding: 10px 20px; border-radius: 99px;
       font-size: 17px; font-weight: 500; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); z-index: 60; pointer-events: none;
