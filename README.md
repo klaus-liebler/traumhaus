@@ -14,6 +14,21 @@ npm run check    # TypeScript-Prüfung
 
 Direkt in ein Haus springen: `?haus=sonnenhaus`, `?haus=villa`, `?haus=strandhaus`.
 
+## Deployment
+
+Ziel: **https://liebler.iui.hs-osnabrueck.de/traumhaus/** – rein statisch, nginx liefert `/var/www/html/traumhaus` aus
+(gleiches Schema wie `rgb/` und `factorycontrol/` auf demselben Server; keine eigene nginx-Konfiguration nötig).
+
+```powershell
+npm run deploy           # bauen, per scp hochladen, auf dem Server einspielen, Erreichbarkeit prüfen
+npm run deploy:trocken   # bauen und nur anzeigen, was hochgeladen/ausgeführt würde
+.\deploy\deploy.ps1 -Zurueck   # vorige Version wieder einspielen (~/traumhaus.vorher)
+```
+
+- Zugang als `srvadmin` per SSH-Schlüssel `%USERPROFILE%\.ssh\id_ed25519_liebler_iui_hs_osnabrueck` (nicht im Repository, wie bei podium); Server nur im Hochschul-VPN erreichbar.
+- Beim allerersten Mal legt das Skript `/var/www/html/traumhaus` mit `sudo` an (fragt nach dem Passwort von srvadmin), danach läuft alles ohne sudo.
+- `deploy/ausrollen.sh` spielt ohne Ausfall ein: erst neue Dateien, dann `index.html`, zuletzt Altes entfernen.
+
 ## Was geht schon
 
 - **Hausauswahl**: drei unmöblierte Häuser im Rohbau (Sonnenhaus, Villa Sternschnuppe mit zwei Etagen und Treppe, Strandhaus Muschel in L-Form). Häuser sind in `src/houses.ts` als Räume + Türen/Fenster beschrieben; Wände, Böden, Decken, Treppen und Dach werden daraus erzeugt (`src/houseBuilder.ts`).

@@ -8,7 +8,9 @@
     "build": "node scripts-bundle-models.mjs && vite build",
     "preview": "vite preview",
     "check": "tsc --noEmit",
-    "models": "node scripts-bundle-models.mjs"
+    "models": "node scripts-bundle-models.mjs",
+    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File deploy/deploy.ps1",
+    "deploy:trocken": "powershell -NoProfile -ExecutionPolicy Bypass -File deploy/deploy.ps1 -Trocken"
   },
   "keywords": [],
   "author": "",
